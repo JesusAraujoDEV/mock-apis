@@ -24,6 +24,8 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - DB_POOL_MAX=${DB_POOL_MAX:-20}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+    labels:
+      - "traefik.enable=true"
     networks:
       - dokploy-network
     healthcheck:
