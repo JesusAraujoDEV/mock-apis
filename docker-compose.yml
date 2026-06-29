@@ -26,18 +26,6 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     networks:
       - dokploy-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mock-engine.rule=Host(`${MOCK_DOMAIN}`)"
-      - "traefik.http.routers.mock-engine.entrypoints=web"
-      - "traefik.http.routers.mock-engine.middlewares=redirect-to-https@docker"
-      - "traefik.http.routers.mock-engine-secure.rule=Host(`${MOCK_DOMAIN}`)"
-      - "traefik.http.routers.mock-engine-secure.entrypoints=websecure"
-      - "traefik.http.routers.mock-engine-secure.tls=true"
-      - "traefik.http.routers.mock-engine-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.mock-engine.loadbalancer.server.port=3000"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/_system/health"]
       interval: 30s
