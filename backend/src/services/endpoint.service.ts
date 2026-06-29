@@ -2,6 +2,7 @@ import { query } from '../config/database';
 import { match, MatchFunction } from 'path-to-regexp';
 
 export interface Endpoint {
+  [key: string]: unknown;
   id: string;
   path: string;
   method: string;

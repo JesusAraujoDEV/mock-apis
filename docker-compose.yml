@@ -3,8 +3,6 @@
 # Target: Dokploy con Traefik como Reverse Proxy
 # ============================================================
 
-version: "3.8"
-
 services:
   # ----------------------------------------------------------
   # Mock Engine (Backend + Frontend estático en un solo servicio)
