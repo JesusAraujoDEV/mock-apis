@@ -1,0 +1,120 @@
+# ============================================================
+# Motor de Mocks Dinámico - Docker Compose
+# Target: Dokploy con Traefik como Reverse Proxy
+# ============================================================
+
+version: "3.8"
+
+services:
+  # ----------------------------------------------------------
+  # Backend: Mock Engine Server
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mock-engine-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SCHEMA=${DB_SCHEMA}
+      - DB_POOL_MAX=${DB_POOL_MAX:-20}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - dokploy-network
+    labels:
+      # --- Traefik Configuration (Dokploy compatible) ---
+      - "traefik.enable=true"
+      
+      # Router HTTP
+      - "traefik.http.routers.mock-engine.rule=Host(`${MOCK_DOMAIN}`)"
+      - "traefik.http.routers.mock-engine.entrypoints=web"
+      - "traefik.http.routers.mock-engine.middlewares=redirect-to-https@docker"
+      
+      # Router HTTPS
+      - "traefik.http.routers.mock-engine-secure.rule=Host(`${MOCK_DOMAIN}`)"
+      - "traefik.http.routers.mock-engine-secure.entrypoints=websecure"
+      - "traefik.http.routers.mock-engine-secure.tls=true"
+      - "traefik.http.routers.mock-engine-secure.tls.certresolver=letsencrypt"
+      
+      # Servicio
+      - "traefik.http.services.mock-engine.loadbalancer.server.port=3000"
+      
+      # Middleware: redirección HTTP -> HTTPS
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+      
+      # Headers de seguridad
+      - "traefik.http.middlewares.mock-engine-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.mock-engine-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.mock-engine-headers.headers.browserXssFilter=true"
+      - "traefik.http.routers.mock-engine-secure.middlewares=mock-engine-headers@docker"
+    depends_on: []
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/_system/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ----------------------------------------------------------
+  # PostgreSQL Database (DESACTIVADO - usando BD externa)
+  # Descomentar si se necesita una instancia local para desarrollo
+  # ----------------------------------------------------------
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: mock-engine-db
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=${DB_USER}
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD}
+  #     - POSTGRES_DB=${DB_NAME}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./backend/src/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+  #   networks:
+  #     - dokploy-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U $$DB_USER -d $$DB_NAME"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+
+  # ----------------------------------------------------------
+  # Frontend: Panel de Control (marcador de posición)
+  # ----------------------------------------------------------
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: mock-engine-frontend
+  #   restart: unless-stopped
+  #   networks:
+  #     - dokploy-network
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.mock-panel.rule=Host(`${PANEL_DOMAIN}`)"
+  #     - "traefik.http.routers.mock-panel.entrypoints=websecure"
+  #     - "traefik.http.routers.mock-panel.tls.certresolver=letsencrypt"
+  #     - "traefik.http.services.mock-panel.loadbalancer.server.port=80"
+
+# ----------------------------------------------------------
+# Volúmenes persistentes
+# ----------------------------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+
+# ----------------------------------------------------------
+# Redes
+# ----------------------------------------------------------
+networks:
+  dokploy-network:
+    external: true
