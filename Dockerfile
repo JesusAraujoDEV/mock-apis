@@ -26,7 +26,6 @@ RUN npm prune --production
 # ============================================================
 FROM node:20-alpine AS production
 
-# Metadata
 LABEL maintainer="mock-engine-team"
 LABEL description="Mock Engine Backend - Dynamic API Mocking Server"
 
@@ -41,7 +40,7 @@ COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
 COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/package.json ./
 
-# Copiar script SQL de inicialización (útil para referencia o init-containers)
+# Copiar script SQL de inicialización
 COPY --chown=appuser:appgroup src/db/init.sql ./db/init.sql
 
 # Cambiar a usuario no-root
@@ -49,10 +48,6 @@ USER appuser
 
 # Exponer puerto
 EXPOSE 3000
-
-# Healthcheck integrado
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/_system/health || exit 1
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production

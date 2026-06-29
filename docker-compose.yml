@@ -1,17 +1,11 @@
-# ============================================================
-# Motor de Mocks Dinámico - Docker Compose
-# Target: Dokploy con Traefik como Reverse Proxy
-# ============================================================
-
 services:
-  # ----------------------------------------------------------
-  # Mock Engine (Backend + Frontend estático en un solo servicio)
-  # ----------------------------------------------------------
   mockapis:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -23,17 +17,3 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - DB_POOL_MAX=${DB_POOL_MAX:-20}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-    labels:
-      - "traefik.enable=true"
-    networks:
-      - dokploy-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/_system/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-networks:
-  dokploy-network:
-    external: true
