@@ -1,6 +1,4 @@
 import Fastify from 'fastify';
-import fastifyStatic from '@fastify/static';
-import path from 'path';
 import { config } from './config/env';
 import { closePool } from './config/database';
 import { catchAllHandler } from './handlers/catchall.handler';
@@ -35,17 +33,6 @@ fastify.addHook('onRequest', async (request, reply) => {
   if (request.method === 'OPTIONS') {
     reply.status(204).send();
   }
-});
-
-// --- Frontend estático en /_panel ---
-fastify.register(fastifyStatic, {
-  root: path.join(__dirname, '..', 'public'),
-  prefix: '/_panel/',
-});
-
-// Redirect raíz del panel
-fastify.get('/_panel', async (_request, reply) => {
-  reply.redirect('/_panel/');
 });
 
 // --- Rutas de sistema ---
