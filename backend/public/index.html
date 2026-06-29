@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Engine - Panel de Control</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .header { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.25rem; color: #f1f5f9; }
+        .header .status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+        .header .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .header .dot.connected { background: #22c55e; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.25rem; }
+        .stat-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #f1f5f9; margin-top: 0.25rem; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .section-title { font-size: 1rem; color: #94a3b8; font-weight: 500; }
+        .endpoints-table { width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
+        .endpoints-table table { width: 100%; border-collapse: collapse; }
+        .endpoints-table th { text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; text-transform: uppercase; color: #64748b; background: #0f172a; border-bottom: 1px solid #334155; }
+        .endpoints-table td { padding: 0.6rem 1rem; font-size: 0.85rem; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+        .endpoints-table tr:hover td { background: #334155; }
+        .method { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+        .method.GET { background: #064e3b; color: #6ee7b7; }
+        .method.POST { background: #1e3a5f; color: #93c5fd; }
+        .method.PUT { background: #713f12; color: #fcd34d; }
+        .method.PATCH { background: #713f12; color: #fcd34d; }
+        .method.DELETE { background: #7f1d1d; color: #fca5a5; }
+        .status-badge { font-size: 0.75rem; }
+        .status-badge.active { color: #22c55e; }
+        .status-badge.inactive { color: #ef4444; }
+        .path-cell { font-family: monospace; color: #e2e8f0; }
+        .btn { padding: 0.4rem 0.75rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: background 0.15s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #059669; color: white; }
+        .btn-success:hover { background: #047857; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-secondary { background: #475569; color: white; }
+        .btn-secondary:hover { background: #374151; }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .actions { display: flex; gap: 0.35rem; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { font-size: 1.25rem; margin-bottom: 1.5rem; color: #f1f5f9; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.35rem; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 0.6rem 0.75rem; background: #0f172a; border: 1px solid #334155;
+            border-radius: 6px; color: #e2e8f0; font-size: 0.875rem; font-family: inherit;
+        }
+        .form-group textarea { font-family: monospace; min-height: 150px; resize: vertical; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #3b82f6; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+        /* Test Response Panel */
+        .test-panel { display: none; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin-top: 1.5rem; }
+        .test-panel.active { display: block; }
+        .test-panel h3 { font-size: 0.9rem; color: #94a3b8; margin-bottom: 0.75rem; }
+        .test-meta { display: flex; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: #64748b; }
+        .test-meta span { background: #1e293b; padding: 0.25rem 0.5rem; border-radius: 4px; }
+        .test-body { background: #1e293b; padding: 1rem; border-radius: 6px; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; color: #a5f3fc; }
+        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Mock Engine</h1>
+        <div class="status">
+            <span class="dot" id="statusDot"></span>
+            <span id="statusText">Conectando...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card"><div class="label">Endpoints Activos</div><div class="value" id="activeCount">—</div></div>
+            <div class="stat-card"><div class="label">Endpoints Inactivos</div><div class="value" id="inactiveCount">—</div></div>
+            <div class="stat-card"><div class="label">Total</div><div class="value" id="totalCount">—</div></div>
+        </div>
+
+        <div class="toolbar">
+            <h2 class="section-title">Endpoints Registrados</h2>
+            <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-secondary" onclick="loadEndpoints()">↻ Recargar</button>
+                <button class="btn btn-primary" onclick="openCreateModal()">+ Nuevo Endpoint</button>
+            </div>
+        </div>
+
+        <div class="endpoints-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Estado</th>
+                        <th>Método</th>
+                        <th>Path</th>
+                        <th>Status</th>
+                        <th>Descripción</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="endpointsBody">
+                    <tr><td colspan="6" class="empty-state">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Test Response Panel -->
+        <div class="test-panel" id="testPanel">
+            <h3>📋 Respuesta del Endpoint</h3>
+            <div class="test-meta">
+                <span id="testMethod"></span>
+                <span id="testPath"></span>
+                <span id="testStatus"></span>
+                <span id="testContentType"></span>
+            </div>
+            <div class="test-body" id="testBody"></div>
+        </div>
+    </div>
+
+    <!-- Modal Crear/Editar -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2 id="modalTitle">Nuevo Endpoint</h2>
+            <form id="endpointForm" onsubmit="handleSubmit(event)">
+                <input type="hidden" id="formId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="formMethod">Método HTTP</label>
+                        <select id="formMethod" required>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="OPTIONS">OPTIONS</option>
+                            <option value="HEAD">HEAD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="formStatusCode">Status Code</label>
+                        <input type="number" id="formStatusCode" value="200" min="100" max="599" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="formPath">Path (ej: /api/v1/recurso o /api/v1/recurso/:id)</label>
+                    <input type="text" id="formPath" placeholder="/api/v1/mi-recurso" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="formResponseType">Content-Type</label>
+                        <select id="formResponseType">
+                            <option value="application/json">application/json</option>
+                            <option value="text/plain">text/plain</option>
+                            <option value="text/csv">text/csv</option>
+                            <option value="text/xml">text/xml</option>
+                            <option value="text/html">text/html</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="formActive">Estado</label>
+                        <select id="formActive">
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="formDescription">Descripción (opcional)</label>
+                    <input type="text" id="formDescription" placeholder="Descripción del endpoint">
+                </div>
+                <div class="form-group">
+                    <label for="formBody">Response Body (JSON)</label>
+                    <textarea id="formBody" placeholder='{"message": "Hello world"}'></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="formSubmitBtn">Crear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API = '';
+        let endpoints = [];
+
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API}/_system/health`);
+                const data = await res.json();
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                if (data.status === 'healthy') { dot.classList.add('connected'); text.textContent = 'Conectado'; }
+                else { dot.classList.remove('connected'); text.textContent = 'Degradado'; }
+            } catch { document.getElementById('statusDot').classList.remove('connected'); document.getElementById('statusText').textContent = 'Desconectado'; }
+        }
+
+        async function loadEndpoints() {
+            try {
+                const res = await fetch(`${API}/_system/endpoints`);
+                endpoints = await res.json();
+                const active = endpoints.filter(e => e.is_active).length;
+                document.getElementById('activeCount').textContent = active;
+                document.getElementById('inactiveCount').textContent = endpoints.length - active;
+                document.getElementById('totalCount').textContent = endpoints.length;
+                renderTable();
+            } catch { document.getElementById('endpointsBody').innerHTML = '<tr><td colspan="6" class="empty-state">Error al cargar. ¿Backend corriendo?</td></tr>'; }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('endpointsBody');
+            if (endpoints.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No hay endpoints registrados</td></tr>'; return; }
+            tbody.innerHTML = endpoints.map(ep => `
+                <tr>
+                    <td><span class="status-badge ${ep.is_active ? 'active' : 'inactive'}">${ep.is_active ? '● Activo' : '○ Inactivo'}</span></td>
+                    <td><span class="method ${ep.method}">${ep.method}</span></td>
+                    <td class="path-cell">${ep.path}</td>
+                    <td>${ep.status_code}</td>
+                    <td>${ep.description || '—'}</td>
+                    <td class="actions">
+                        <button class="btn btn-success btn-sm" onclick="testEndpoint('${ep.id}')" title="Probar">▶ Test</button>
+                        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${ep.id}')" title="Editar">✎</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteEndpoint('${ep.id}')" title="Eliminar">✕</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function testEndpoint(id) {
+            try {
+                const res = await fetch(`${API}/_system/endpoints/${id}/test`, { method: 'POST' });
+                const data = await res.json();
+                const panel = document.getElementById('testPanel');
+                panel.classList.add('active');
+                document.getElementById('testMethod').textContent = data.method;
+                document.getElementById('testPath').textContent = data.url;
+                document.getElementById('testStatus').textContent = `Status: ${data.status_code}`;
+                document.getElementById('testContentType').textContent = data.content_type;
+                document.getElementById('testBody').textContent = JSON.stringify(data.response_body, null, 2);
+            } catch (err) { alert('Error al probar endpoint'); }
+        }
+
+        async function deleteEndpoint(id) {
+            if (!confirm('¿Eliminar este endpoint?')) return;
+            try {
+                await fetch(`${API}/_system/endpoints/${id}`, { method: 'DELETE' });
+                loadEndpoints();
+                document.getElementById('testPanel').classList.remove('active');
+            } catch { alert('Error al eliminar'); }
+        }
+
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Nuevo Endpoint';
+            document.getElementById('formSubmitBtn').textContent = 'Crear';
+            document.getElementById('formId').value = '';
+            document.getElementById('formPath').value = '';
+            document.getElementById('formMethod').value = 'GET';
+            document.getElementById('formStatusCode').value = '200';
+            document.getElementById('formResponseType').value = 'application/json';
+            document.getElementById('formActive').value = 'true';
+            document.getElementById('formDescription').value = '';
+            document.getElementById('formBody').value = '{\n  \n}';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function openEditModal(id) {
+            const ep = endpoints.find(e => e.id === id);
+            if (!ep) return;
+            document.getElementById('modalTitle').textContent = 'Editar Endpoint';
+            document.getElementById('formSubmitBtn').textContent = 'Guardar';
+            document.getElementById('formId').value = ep.id;
+            document.getElementById('formPath').value = ep.path;
+            document.getElementById('formMethod').value = ep.method;
+            document.getElementById('formStatusCode').value = ep.status_code;
+            document.getElementById('formResponseType').value = ep.response_type;
+            document.getElementById('formActive').value = String(ep.is_active);
+            document.getElementById('formDescription').value = ep.description || '';
+            document.getElementById('formBody').value = JSON.stringify(ep.response_body, null, 2);
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            const id = document.getElementById('formId').value;
+            let body;
+            try { body = JSON.parse(document.getElementById('formBody').value); }
+            catch { alert('El Response Body no es JSON válido'); return; }
+
+            const payload = {
+                path: document.getElementById('formPath').value,
+                method: document.getElementById('formMethod').value,
+                status_code: parseInt(document.getElementById('formStatusCode').value),
+                response_type: document.getElementById('formResponseType').value,
+                is_active: document.getElementById('formActive').value === 'true',
+                description: document.getElementById('formDescription').value || null,
+                response_body: body,
+            };
+
+            try {
+                const url = id ? `${API}/_system/endpoints/${id}` : `${API}/_system/endpoints`;
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) { const err = await res.json(); alert(err.error || 'Error'); return; }
+                closeModal();
+                loadEndpoints();
+            } catch { alert('Error de red'); }
+        }
+
+        checkHealth();
+        loadEndpoints();
+        setInterval(checkHealth, 10000);
+    </script>
+</body>
+</html>
